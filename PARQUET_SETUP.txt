@@ -1,0 +1,1 @@
+Upload the six files inside data/ohlcv/ to GitHub. Do not upload the original 127 MB ZIP. Then run Actions > Daily EOD update.
