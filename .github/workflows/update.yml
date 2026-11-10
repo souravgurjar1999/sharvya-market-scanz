@@ -1,0 +1,57 @@
+name: Daily EOD update
+
+on:
+  schedule:
+    - cron: "30 13 * * 1-5"
+  workflow_dispatch: {}
+  push:
+    paths:
+      - "sector_map.csv"
+      - "data/ohlcv/**"
+      - "update.py"
+      - ".github/workflows/update.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: eod-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python packages
+        run: pip install pandas requests pyarrow
+
+      - name: Restore price history
+        uses: actions/cache@v4
+        with:
+          path: history.csv.gz
+          key: price-history-${{ github.run_id }}
+          restore-keys: |
+            price-history-
+
+      - name: Generate market data
+        run: python update.py
+
+      - name: Commit generated data
+        run: |
+          git config user.name "sa-monitor-bot"
+          git config user.email "sa-monitor-bot@users.noreply.github.com"
+          git add data.json screener_data.json
+          git add gann_data.json || true
+          git add gann_history || true
+          git add listing_dates.csv || true
+          git diff --cached --quiet || git commit -m "Update market data $(date -u +%F)"
+          git pull --rebase origin ${GITHUB_REF_NAME} || true
+          git push
